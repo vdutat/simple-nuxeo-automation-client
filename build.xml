@@ -2,6 +2,7 @@
 <project name="simple-nuxeo-automation-client" default="exec" basedir=".">
 
   <property name="mvn.opts" value="" />
+  <property name="mainClass" value="org.nuxeo.vdutat.MyAutomationClient" />
 
   <condition property="osfamily-unix">
     <os family="unix" />
@@ -45,8 +46,7 @@
       <arg value="clean" />
       <arg value="compile" />
       <arg value="exec:java" />
-      <arg value="-Dexec.mainClass=org.nuxeo.vdutat.MyAutomationClient" />
-      <arg value="${mvn.opts}" />
+      <arg value="-Dexec.mainClass=${mainClass}" />
     </exec>
   </target>
 
