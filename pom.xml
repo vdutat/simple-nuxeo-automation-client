@@ -13,7 +13,7 @@
   <classifier>jar-with-dependencies</classifier>
   		<version>7.3-SNAPSHOT</version>
   		 -->
-  		<version>6.0-HF18</version>
+  		<version>6.0-HF20</version>
   	</dependency>
   </dependencies>
   

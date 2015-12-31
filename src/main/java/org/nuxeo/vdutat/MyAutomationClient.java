@@ -16,6 +16,7 @@ import org.nuxeo.ecm.automation.client.jaxrs.impl.HttpAutomationClient;
 import org.nuxeo.ecm.automation.client.jaxrs.spi.auth.PortalSSOAuthInterceptor;
 import org.nuxeo.ecm.automation.client.model.Document;
 import org.nuxeo.ecm.automation.client.model.Documents;
+import org.nuxeo.ecm.automation.client.model.PaginableDocuments;
 
 /**
  * @author vdutat
@@ -46,18 +47,45 @@ public class MyAutomationClient {
 //		testSUPNXP13087_callQueryChainWithStringParam(session);
 //      testSUPNXP13130(session);
 //		testUndeleteDocument(session, "/default-domain/workspaces/ws1/file 1");
-		restoreVersion(session, "/default-domain/workspaces/ws1/file 1", "1.0");
+//		restoreVersion(session, "/default-domain/workspaces/ws1/file 1", "1.0");
+//		testNXP(session, "/default-domain/workspaces/ws1/doc3");
+		// SUPNXP-14547
+        testSUPNXP14547(session, "Document.Query", "/default-domain/workspaces/tmp");
+//        query(session, "SELECT * FROM Document where ecm:path STARTSWITH '/default-domain/workspaces/tmp'");
 		
 		client.shutdown();
 	}
 
-	private static void restoreVersion(Session session, String pathOrId, String versionLabel) throws Exception {
+	private static void testNXP(Session session, String pathOrId) throws Exception {
+	    printVersions(session, pathOrId);
+	    getDocumentHistory(session, pathOrId);
+    }
+
+    private static void printVersions(Session session, String pathOrId) throws Exception {
+        Document doc = (Document) session.newRequest("Document.Fetch")
+                .set("value", pathOrId)
+                .execute();
+        Documents versions = (Documents) session.newRequest("Document.GetVersions")
+                .setInput(doc)
+                .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
+                .execute();
+        if (!versions.isEmpty()) {
+            for (Document version : versions) {
+                System.out.println(version + ": version " + version.getVersionLabel() + " (" + version.getProperties().getString("dc:description") + ")");
+            }
+        } else {
+            System.err.println("No version for document " + doc);
+        }
+    }
+
+    private static void restoreVersion(Session session, String pathOrId, String versionLabel) throws Exception {
         Document doc = (Document) session.newRequest("Document.Fetch")
                 .set("value", pathOrId)
                 .execute();
         System.out.println("Restoring version " + versionLabel + " of document " + doc.getPath() + " (" + doc.getProperties().getString("dc:description") + ")");
         Documents versions = (Documents) session.newRequest("Document.GetVersions")
                 .setInput(doc)
+                .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
                 .execute();
         if (!versions.isEmpty() && !versionLabel.equals(doc.getVersionLabel())) {
             boolean versionFound = false;
@@ -102,10 +130,12 @@ public class MyAutomationClient {
 		Documents docs = (Documents) session.newRequest("Document.Query")
 				.setHeader(Constants.HEADER_NX_SCHEMAS, "*")
 				.set("query",nxql)
-				.execute();
+				.execute(); // 1000 documents max. !!!!!!!!!!!!!!!!!
+		int index = 0;
 		if (!docs.isEmpty()) {
 			System.out.println(docs);
 			for (Document doc : docs) {
+                System.out.println("index:" + ++index);
 				System.out.println("title:" + doc.getTitle());
 				System.out.println("state:" + doc.getState());
 				System.out.println("version:" + doc.getVersionLabel());
@@ -205,6 +235,49 @@ public class MyAutomationClient {
             request.execute();
         }
 
+    }
+    
+    protected static void testSUPNXP14547(Session session, String opName, String pathOrId) throws Exception {
+        Document doc = (Document) session.newRequest("Document.Fetch")
+                .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
+                .set("value", pathOrId)
+                .execute();
+        final int pageSize = 100;
+//        String opName = "Document.Query";
+//        String opName = "Document.PageProvider";
+        if ("Document.Query".equals(opName)) {
+            OperationRequest request = session.newRequest(opName)
+                    .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
+                    .set("query", "SELECT * FROM Document WHERE ecm:parentId = '" + doc.getId() + "'")
+                    .set("pageSize", pageSize);
+            PaginableDocuments docs;
+            int pageIndex = 0;
+            do {
+                docs = (PaginableDocuments) request.set("currentPageIndex", pageIndex).execute();
+                System.out.println("Page " + (docs.getCurrentPageIndex() + 1) + "/" + docs.getNumberOfPages());
+                for (Document elem : docs) {
+                    System.out.println("- " + elem.getId() + " - " + elem.getString("dc:title"));
+                }
+                pageIndex++;
+            } while ((docs.getCurrentPageIndex()+1) < docs.getNumberOfPages());
+        } else {
+            // Document.PageProvider
+            OperationRequest request = session.newRequest("Document.PageProvider")
+                    .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
+                    .set("maxResults", "-1")
+                    .set("query", "SELECT * FROM Document WHERE ecm:parentId = '" + doc.getId() + "'")
+                    .set("pageSize", pageSize);
+            PaginableDocuments docs;
+            int pageIndex = 0;
+            do {
+            docs = (PaginableDocuments) request.set("currentPageIndex", pageIndex).execute();
+                System.out.println("Page " + (docs.getCurrentPageIndex() + 1) + "/" + docs.getNumberOfPages());
+                for (Document elem : docs) {
+                    System.out.println("- " + elem.getId() + " - " + elem.getString("dc:title"));
+                }
+                pageIndex++;
+            } while ((docs.getCurrentPageIndex()+1) < docs.getNumberOfPages());
+        }
     }
     
     private static void usePortalSSOAuthentication(HttpAutomationClient client) {
