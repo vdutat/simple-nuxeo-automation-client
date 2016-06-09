@@ -1,3 +1,21 @@
+/*
+ * (C) Copyright 2016 Nuxeo SA (http://nuxeo.com/) and others.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Contributors:
+ *     vdutat
+ */
 package org.nuxeo.vdutat;
 
 import java.util.ArrayList;
@@ -20,7 +38,7 @@ import org.nuxeo.ecm.automation.client.model.PathRef;
 
 /**
  * @author vdutat
- * 
+ *
  * mvn clean compile exec:java -Dexec.mainClass="org.nuxeo.vdutat.MyAutomationClient"
  */
 public class MyAutomationClient {
@@ -39,7 +57,7 @@ public class MyAutomationClient {
 		} else {
 		    session = client.getSession("Administrator", "Administrator");
 		}
-		    
+
 //		query(session, "SELECT * FROM File where ecm:path STARTSWITH '/default-domain/workspaces/SUPNXP-13087'");
 //		getDocumentHistory(session, "/default-domain/workspaces/ws1/file 1");
 //		testSUPNXP13087(session);
@@ -51,10 +69,10 @@ public class MyAutomationClient {
 //		testNXP(session, "/default-domain/workspaces/ws1/doc3");
 		// SUPNXP-14547
 //        testSUPNXP14547(session, "Document.Query", "/default-domain/workspaces/tmp");
-//        query(session, "SELECT * FROM Document where ecm:path STARTSWITH '/default-domain/workspaces/tmp'");
+        query(session, "SELECT * FROM Document where ecm:path STARTSWITH '/default-domain/workspaces/ws1'");
 //        testSUPNXP15586(session, "/default-domain/workspaces/SUPNXP-15586");
-        testSUPNXP16421_updateMultiValuedProperty(session, "/default-domain/workspaces/SUPNXP-16421/File 001");
-		
+//        testSUPNXP16421_updateMultiValuedProperty(session, "/default-domain/workspaces/SUPNXP-16421/File 001");
+
 		client.shutdown();
 	}
 
@@ -160,7 +178,7 @@ public class MyAutomationClient {
 				.execute();
 		System.out.println("result:" + result);
 		JsonNode node = (JsonNode) result;
-		
+
 		int count = node.get("currentPageSize").getValueAsInt();
 		JsonNode entries = node.get("entries");
 		for (int i = 0; i < count; i++) {
@@ -171,7 +189,7 @@ public class MyAutomationClient {
 			System.out.println(" user:" + entries.get(i).get("principalName").getValueAsText());
 		}
 	}
-	
+
 	protected static void testSUPNXP13087(Session session) throws Exception {
 		Documents docs = (Documents) session.newRequest("Document.Query")
 				.set("query","SELECT * FROM File where ecm:path STARTSWITH '/default-domain/workspaces/SUPNXP-13087'")
@@ -184,7 +202,7 @@ public class MyAutomationClient {
 			System.out.println("No documents found");
 		}
 	}
-	
+
 	protected static void testSUPNXP13087_eachDoc(Session session) throws Exception {
 		Documents docs = (Documents) session.newRequest("Document.Query")
 				.set("query", "SELECT * FROM File WHERE ecm:path STARTSWITH '/default-domain/workspaces/SUPNXP-13087'")
@@ -222,7 +240,7 @@ public class MyAutomationClient {
 			System.out.println("No document 'File' found");
 		}
 	}
-    
+
     protected static void testSUPNXP13130(Session session) throws Exception {
         Documents docs = (Documents) session.newRequest("Document.Query")
                 .set("query", "SELECT * FROM File WHERE ecm:path STARTSWITH '/default-domain/workspaces/SUPNXP-13087'")
@@ -238,7 +256,7 @@ public class MyAutomationClient {
         }
 
     }
-    
+
     protected static void testSUPNXP14547(Session session, String opName, String pathOrId) throws Exception {
         Document doc = (Document) session.newRequest("Document.Fetch")
                 .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
@@ -281,7 +299,7 @@ public class MyAutomationClient {
             } while ((docs.getCurrentPageIndex()+1) < docs.getNumberOfPages());
         }
     }
-    
+
     protected static void testSUPNXP15586(Session session, String pathOrId) throws Exception {
         Documents docs = (Documents) session.newRequest("Document.Query")
                 .set("query", "SELECT * FROM File WHERE ecm:path STARTSWITH '" + pathOrId + "'")
@@ -305,7 +323,7 @@ public class MyAutomationClient {
         // Update document in repository
         documentService.update(doc);
     }
-    
+
     private static void usePortalSSOAuthentication(HttpAutomationClient client) {
         client.setRequestInterceptor(new PortalSSOAuthInterceptor("nuxeo5secretkey", "Administrator"));
     }
