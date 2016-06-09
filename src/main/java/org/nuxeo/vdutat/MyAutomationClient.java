@@ -1,9 +1,7 @@
 package org.nuxeo.vdutat;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import javax.ws.rs.core.MediaType;
 
@@ -12,11 +10,13 @@ import org.codehaus.jackson.JsonNode;
 import org.nuxeo.ecm.automation.client.Constants;
 import org.nuxeo.ecm.automation.client.OperationRequest;
 import org.nuxeo.ecm.automation.client.Session;
+import org.nuxeo.ecm.automation.client.adapters.DocumentService;
 import org.nuxeo.ecm.automation.client.jaxrs.impl.HttpAutomationClient;
 import org.nuxeo.ecm.automation.client.jaxrs.spi.auth.PortalSSOAuthInterceptor;
 import org.nuxeo.ecm.automation.client.model.Document;
 import org.nuxeo.ecm.automation.client.model.Documents;
 import org.nuxeo.ecm.automation.client.model.PaginableDocuments;
+import org.nuxeo.ecm.automation.client.model.PathRef;
 
 /**
  * @author vdutat
@@ -50,8 +50,10 @@ public class MyAutomationClient {
 //		restoreVersion(session, "/default-domain/workspaces/ws1/file 1", "1.0");
 //		testNXP(session, "/default-domain/workspaces/ws1/doc3");
 		// SUPNXP-14547
-        testSUPNXP14547(session, "Document.Query", "/default-domain/workspaces/tmp");
+//        testSUPNXP14547(session, "Document.Query", "/default-domain/workspaces/tmp");
 //        query(session, "SELECT * FROM Document where ecm:path STARTSWITH '/default-domain/workspaces/tmp'");
+//        testSUPNXP15586(session, "/default-domain/workspaces/SUPNXP-15586");
+        testSUPNXP16421_updateMultiValuedProperty(session, "/default-domain/workspaces/SUPNXP-16421/File 001");
 		
 		client.shutdown();
 	}
@@ -278,6 +280,30 @@ public class MyAutomationClient {
                 pageIndex++;
             } while ((docs.getCurrentPageIndex()+1) < docs.getNumberOfPages());
         }
+    }
+    
+    protected static void testSUPNXP15586(Session session, String pathOrId) throws Exception {
+        Documents docs = (Documents) session.newRequest("Document.Query")
+                .set("query", "SELECT * FROM File WHERE ecm:path STARTSWITH '" + pathOrId + "'")
+                .execute();
+        if (!docs.isEmpty()) {
+            Documents updatedDocs = (Documents) session.newRequest("Document.Update")
+                .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
+                .setInput(docs).set("save", "true")
+                .set("properties", "dc:description=updated to test SUPNXP-15586")
+                .execute();
+            assert docs.size() == updatedDocs.size();
+        }
+    }
+
+    private static void testSUPNXP16421_updateMultiValuedProperty(Session session, String pathOrId) throws Exception {
+        DocumentService documentService = session.getAdapter(DocumentService.class);
+        // Fetch the document with all its properties (all schemas)
+        Document doc = documentService.getDocument(new PathRef(pathOrId), "*");
+        // Modify multi-valued property: add 3 elements: "arts", "business" and "c,d"
+        doc.set("dc:subjects", "arts,business,c\\,d");
+        // Update document in repository
+        documentService.update(doc);
     }
     
     private static void usePortalSSOAuthentication(HttpAutomationClient client) {
