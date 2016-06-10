@@ -18,6 +18,7 @@
  */
 package org.nuxeo.vdutat;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,6 +32,8 @@ import org.nuxeo.ecm.automation.client.Session;
 import org.nuxeo.ecm.automation.client.adapters.DocumentService;
 import org.nuxeo.ecm.automation.client.jaxrs.impl.HttpAutomationClient;
 import org.nuxeo.ecm.automation.client.jaxrs.spi.auth.PortalSSOAuthInterceptor;
+import org.nuxeo.ecm.automation.client.model.Blob;
+import org.nuxeo.ecm.automation.client.model.Blobs;
 import org.nuxeo.ecm.automation.client.model.Document;
 import org.nuxeo.ecm.automation.client.model.Documents;
 import org.nuxeo.ecm.automation.client.model.PaginableDocuments;
@@ -69,14 +72,31 @@ public class MyAutomationClient {
 //		testNXP(session, "/default-domain/workspaces/ws1/doc3");
 		// SUPNXP-14547
 //        testSUPNXP14547(session, "Document.Query", "/default-domain/workspaces/tmp");
-        query(session, "SELECT * FROM Document where ecm:path STARTSWITH '/default-domain/workspaces/ws1'");
+//        query(session, "SELECT * FROM Document where ecm:path STARTSWITH '/default-domain/workspaces/ws1'");
 //        testSUPNXP15586(session, "/default-domain/workspaces/SUPNXP-15586");
 //        testSUPNXP16421_updateMultiValuedProperty(session, "/default-domain/workspaces/SUPNXP-16421/File 001");
+        testSUPNXP17085_getFiles(session, "/default-domain/workspaces/SUPNXP-17085/File 001");
 
 		client.shutdown();
 	}
 
-	private static void testNXP(Session session, String pathOrId) throws Exception {
+	private static void testSUPNXP17085_getFiles(Session session, String pathOrId) throws IOException {
+	    System.out.println("<testSUPNXP17085_getFiles> " + pathOrId);
+        Document doc = (Document) session.newRequest("Document.Fetch")
+                .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
+                .set("value", pathOrId)
+                .execute();
+        Blobs blobs = (Blobs) session.newRequest("Blob.GetList") // BDocument.GetBlobsByProperty
+            .setInput(doc)
+//            .set("xpath", "files:files")
+            .execute();
+        System.out.println("Attached files of " + doc.getPath() + ":");
+        for (Blob blob : blobs) {
+            System.out.println(blob);
+        }
+    }
+
+    private static void testNXP(Session session, String pathOrId) throws Exception {
 	    printVersions(session, pathOrId);
 	    getDocumentHistory(session, pathOrId);
     }
