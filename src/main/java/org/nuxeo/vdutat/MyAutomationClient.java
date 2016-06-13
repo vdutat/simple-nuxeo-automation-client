@@ -19,8 +19,10 @@
 package org.nuxeo.vdutat;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.ws.rs.core.MediaType;
 
@@ -38,6 +40,7 @@ import org.nuxeo.ecm.automation.client.model.Document;
 import org.nuxeo.ecm.automation.client.model.Documents;
 import org.nuxeo.ecm.automation.client.model.PaginableDocuments;
 import org.nuxeo.ecm.automation.client.model.PathRef;
+import org.nuxeo.ecm.automation.client.model.RecordSet;
 
 /**
  * @author vdutat
@@ -75,18 +78,23 @@ public class MyAutomationClient {
 //        query(session, "SELECT * FROM Document where ecm:path STARTSWITH '/default-domain/workspaces/ws1'");
 //        testSUPNXP15586(session, "/default-domain/workspaces/SUPNXP-15586");
 //        testSUPNXP16421_updateMultiValuedProperty(session, "/default-domain/workspaces/SUPNXP-16421/File 001");
-        testSUPNXP17085_getFiles(session, "/default-domain/workspaces/SUPNXP-17085/File 001");
+//        testSUPNXP17085_getFiles(session, "/default-domain/workspaces/SUPNXP-17085/File 001");
+        test17090_query(session, "SELECT * FROM Document where ecm:path STARTSWITH '/default-domain/workspaces/fileImporter'");
 
 		client.shutdown();
 	}
 
-	private static void testSUPNXP17085_getFiles(Session session, String pathOrId) throws IOException {
+	private static void test17090_query(Session session, String nxql) throws Exception {
+	    queryAll(session, nxql, 500);
+    }
+
+    private static void testSUPNXP17085_getFiles(Session session, String pathOrId) throws IOException {
 	    System.out.println("<testSUPNXP17085_getFiles> " + pathOrId);
         Document doc = (Document) session.newRequest("Document.Fetch")
                 .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
                 .set("value", pathOrId)
                 .execute();
-        Blobs blobs = (Blobs) session.newRequest("Blob.GetList") // BDocument.GetBlobsByProperty
+        Blobs blobs = (Blobs) session.newRequest("Blob.GetList") // Document.GetBlobsByProperty
             .setInput(doc)
 //            .set("xpath", "files:files")
             .execute();
@@ -166,14 +174,39 @@ public class MyAutomationClient {
         }
     }
 
+    private static void queryRecordSet(Session session, String nxql) throws Exception {
+        System.out.println("<queryRecordSet> " + nxql);
+        RecordSet docs = (RecordSet) session
+//                .newRequest("Repository.ResultSetPageProvider")
+//                .set("maxResults", "-1")
+                .newRequest("Repository.ResultSetQuery")
+                .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
+                .set("query",nxql)
+                .set("pageSize", 0)
+                .execute(); // 1000 documents max. !!!!!!!!!!!!!!!!!
+        int index = 0;
+        if (!docs.isEmpty()) {
+            System.out.println(docs.size() + " documents found: " + docs);
+            for (Map<String, Serializable> doc : docs) {
+                System.out.println("index:" + ++index);
+                System.out.println("title:" + doc);
+//                System.out.println("state:" + doc.getState());
+//                System.out.println("version:" + doc.getVersionLabel());
+//                System.out.println("Last modification:" + doc.getLastModified());
+//                System.out.println("Creator:" + doc.getString("dc:creator"));
+            }
+        }
+    }
+
     private static void query(Session session, String nxql) throws Exception {
-		Documents docs = (Documents) session.newRequest("Document.Query")
+		Documents docs = (Documents) session
+		        .newRequest("Document.Query")
 				.setHeader(Constants.HEADER_NX_SCHEMAS, "*")
 				.set("query",nxql)
 				.execute(); // 1000 documents max. !!!!!!!!!!!!!!!!!
 		int index = 0;
 		if (!docs.isEmpty()) {
-			System.out.println(docs);
+			System.out.println(docs.size() + " documents found: " + docs);
 			for (Document doc : docs) {
                 System.out.println("index:" + ++index);
 				System.out.println("title:" + doc.getTitle());
@@ -184,6 +217,35 @@ public class MyAutomationClient {
 			}
 		}
 	}
+
+    private static void queryAll(Session session, String nxql, int pageSize) throws Exception {
+        Documents docs = null;
+        int pageNbr = 0;
+        int totalDocsNbr = 0;
+        do {
+            docs = (Documents) session.newRequest("Repository.Query")
+                    .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
+                    .set("currentPageIndex", pageNbr)
+                    .set("pageSize", pageSize)
+                    .set("query",nxql)
+                    .execute(); // 1000 documents max. !!!!!!!!!!!!!!!!!
+            int index = 0;
+            if (!docs.isEmpty()) {
+                System.out.println("page " + pageNbr + " / " + docs.size() + " documents found: " + docs);
+                for (Document doc : docs) {
+                    System.out.println("index:" + ++index);
+                    System.out.println("title:" + doc.getTitle());
+                    System.out.println("state:" + doc.getState());
+                    System.out.println("version:" + doc.getVersionLabel());
+                    System.out.println("Last modification:" + doc.getLastModified());
+                    System.out.println("Creator:" + doc.getString("dc:creator"));
+                }
+            }
+            pageNbr++;
+            totalDocsNbr += docs.size();
+        } while (docs.size() == pageSize);
+        System.out.println("Total number of documents: " + totalDocsNbr);
+    }
 
 	private static void getDocumentHistory(Session session, String pathOrId) throws Exception {
 		Document doc = (Document) session.newRequest("Document.Fetch")
