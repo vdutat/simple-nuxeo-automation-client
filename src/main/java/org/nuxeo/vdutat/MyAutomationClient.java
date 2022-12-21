@@ -20,14 +20,20 @@ package org.nuxeo.vdutat;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.ws.rs.core.MediaType;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.type.TypeReference;
 import org.nuxeo.ecm.automation.client.Constants;
 import org.nuxeo.ecm.automation.client.OperationRequest;
 import org.nuxeo.ecm.automation.client.Session;
@@ -79,9 +85,50 @@ public class MyAutomationClient {
 //        testSUPNXP15586(session, "/default-domain/workspaces/SUPNXP-15586");
 //        testSUPNXP16421_updateMultiValuedProperty(session, "/default-domain/workspaces/SUPNXP-16421/File 001");
 //        testSUPNXP17085_getFiles(session, "/default-domain/workspaces/SUPNXP-17085/File 001");
-        test17090_query(session, "SELECT * FROM Document where ecm:path STARTSWITH '/default-domain/workspaces/fileImporter'");
+//        test17090_query(session, "SELECT * FROM Document where ecm:path STARTSWITH '/default-domain/workspaces/fileImporter'");
+//        testSUPNXP17239_addEntryToDirectory(session, "nature", "nature1", "Nature 1");
+//        testSUPNXP17352_queryAverage(session, "SELECT AVG(dss:innerSize) FROM Document WHERE ecm:isProxy = 0 AND ecm:isCheckedInVersion = 0 AND ecm:currentLifeCycleState <> 'deleted'");
+        testSUPNXP27334(session);
 
 		client.shutdown();
+	}
+
+	private static void testSUPNXP17352_queryAverage(Session session, String query) throws Exception {
+	    System.out.println("<testSUPNXP17352_queryAverage> " + query);
+	    RecordSet docs = (RecordSet) session.newRequest("Repository.ResultSetQuery")
+                .set("query", query)
+                .execute();
+        if (!docs.isEmpty()) {
+            docs.stream().forEach(result -> {int index = 0;System.out.println("index: " + ++index);System.out.println("result: " + result);});
+        }
+        System.out.println("Total number of results: " + docs.size());
+
+	}
+
+	private static void testSUPNXP17239_addEntryToDirectory(Session session, String directoryName, String id, String label) throws Exception {
+	    System.out.println("<testSUPNXP17239_addEntryToDirectory> " + directoryName);
+	    Blob blob = (Blob) session.newRequest("Directory.Entries")
+                .set("directoryName", directoryName)
+                .execute();
+        if (blob != null) {
+            StringWriter jsonEntries = new StringWriter();
+            IOUtils.copy(blob.getStream(), jsonEntries, "UTF-8");
+            System.out.println("JSON: " + jsonEntries.toString().replace("},{", "}\n{"));
+            ObjectMapper mapper = new ObjectMapper();
+            List<Map<String, Object>> entries = mapper.readValue(jsonEntries.toString(), new TypeReference<List<Map<String, Object>>>() {});
+            entries.stream().forEach(entry -> System.out.println("id: " + entry.get("id") + " label: " + entry.get("label")));
+            if (entries.stream().filter(entry -> entry.get("id").equals(id)).collect(Collectors.toList()).isEmpty()) {
+        		System.out.println("Ading entry " + id);
+        	    blob = (Blob) session.newRequest("Directory.CreateEntries")
+                        .set("directoryName", directoryName)
+                        .set("entries", String.format("[{\"ordering\":10000000,\"obsolete\":0,\"id\":\"%s\",\"label\":\"%s\"}]", id, label))
+                        .execute();
+                StringWriter newJsonEntries = new StringWriter();
+                IOUtils.copy(blob.getStream(), newJsonEntries, "UTF-8");
+                System.out.println("JSON: " + newJsonEntries.toString().replace("},{", "}\n{"));
+            }
+        }
+
 	}
 
 	private static void test17090_query(Session session, String nxql) throws Exception {
@@ -387,13 +434,34 @@ public class MyAutomationClient {
                 .set("query", "SELECT * FROM File WHERE ecm:path STARTSWITH '" + pathOrId + "'")
                 .execute();
         if (!docs.isEmpty()) {
+        	Map<String, String> propMap = new HashMap<String, String>();
+        	propMap.put("dc:description", "updated to test SUPNXP-15586");
+        	// Java 9
+        	//Map<String, String> propMap = Map.of("dc:description","updated to test SUPNXP-15586");
+        	String s = propMap.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(Collectors.joining("\n"));
             Documents updatedDocs = (Documents) session.newRequest("Document.Update")
                 .setHeader(Constants.HEADER_NX_SCHEMAS, "*")
                 .setInput(docs).set("save", "true")
-                .set("properties", "dc:description=updated to test SUPNXP-15586")
+//                .set("properties", "dc:description=updated to test SUPNXP-15586")
+                .set("properties", s)
                 .execute();
             assert docs.size() == updatedDocs.size();
         }
+    }
+
+    protected static void testSUPNXP27334(Session session) throws Exception {
+    	Map<String, String> propMap = new HashMap<String, String>();
+    	propMap.put("param1", "val1");
+    	propMap.put("param2", "val2");
+    	// Java 9
+    	//Map<String, String> propMap = Map.of("dc:description","updated to test SUPNXP-15586");
+    	String s = propMap.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(Collectors.joining("\n"));
+    	Document doc = (Document) session.newRequest("Document.UpdateMessagesStatus")
+    			.setInput("/")
+//                .set("properties", "dc:description=updated to test SUPNXP-15586")
+//    			.set("properties", s)
+    			.set("properties", propMap)
+    			.execute();
     }
 
     private static void testSUPNXP16421_updateMultiValuedProperty(Session session, String pathOrId) throws Exception {
